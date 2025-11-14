@@ -1,0 +1,114 @@
+services:
+
+  # MinIO
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Trino Coordinator
+  trino-coordinator:
+    image: trinodb/trino:424
+    container_name: trino-coordinator
+    hostname: trino-coordinator
+    user: "trino:trino"
+    ports:
+      - "8080:8080"
+    environment:
+      - DISCOVERY_URI=http://trino-coordinator:8080
+    volumes:
+      - ./etc/catalog:/etc/trino/catalog
+      - ./etc/config.properties.coordinator:/etc/trino/config.properties
+      - ./etc/node.properties:/etc/trino/node.properties
+      - ./etc/jvm.config:/etc/trino/jvm.config
+      - trino_data:/var/trino
+      - trino_staging:/tmp/s3-staging
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Trino Workers
+  trino-worker-1:
+    image: trinodb/trino:424
+    container_name: trino-worker-1
+    hostname: trino-worker-1
+    user: "trino:trino"
+    environment:
+      - DISCOVERY_URI=http://trino-coordinator:8080
+    volumes:
+      - ./etc/catalog:/etc/trino/catalog
+      - ./etc/config.properties.worker:/etc/trino/config.properties
+      - ./etc/node.properties:/etc/trino/node.properties
+      - ./etc/jvm.config:/etc/trino/jvm.config
+      - trino_data_worker1:/var/trino
+      - trino_staging_worker1:/tmp/s3-staging
+    depends_on:
+      trino-coordinator:
+        condition: service_healthy
+
+  trino-worker-2:
+    image: trinodb/trino:424
+    container_name: trino-worker-2
+    hostname: trino-worker-2
+    user: "trino:trino"
+    environment:
+      - DISCOVERY_URI=http://trino-coordinator:8080
+    volumes:
+      - ./etc/catalog:/etc/trino/catalog
+      - ./etc/config.properties.worker:/etc/trino/config.properties
+      - ./etc/node.properties:/etc/trino/node.properties
+      - ./etc/jvm.config:/etc/trino/jvm.config
+      - trino_data_worker2:/var/trino
+      - trino_staging_worker2:/tmp/s3-staging
+    depends_on:
+      trino-coordinator:
+        condition: service_healthy
+
+  trino-worker-3:
+    image: trinodb/trino:424
+    container_name: trino-worker-3
+    hostname: trino-worker-3
+    user: "trino:trino"
+    environment:
+      - DISCOVERY_URI=http://trino-coordinator:8080
+    volumes:
+      - ./etc/catalog:/etc/trino/catalog
+      - ./etc/config.properties.worker:/etc/trino/config.properties
+      - ./etc/node.properties:/etc/trino/node.properties
+      - ./etc/jvm.config:/etc/trino/jvm.config
+      - trino_data_worker3:/var/trino
+      - trino_staging_worker3:/tmp/s3-staging
+    depends_on:
+      trino-coordinator:
+        condition: service_healthy
+
+volumes:
+  minio_data:
+  trino_data:
+  trino_data_worker1:
+  trino_data_worker2:
+  trino_data_worker3:
+  trino_staging:
+  trino_staging_worker1:
+  trino_staging_worker2:
+  trino_staging_worker3:
